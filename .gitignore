@@ -1,0 +1,30 @@
+# Dataset & large binary files (too large for GitHub)
+mitbih_data/
+processed/
+checkpoints/
+
+# Results (optional — comment out if you want to include plots)
+results/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+env/
+.venv/
+
+# macOS
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
