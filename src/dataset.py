@@ -32,7 +32,6 @@ def _get_transforms():
     """Return (train_transform, eval_transform)."""
 
     train_transform = transforms.Compose([
-        transforms.Resize((IMG_SIZE, IMG_SIZE)),
         transforms.RandomVerticalFlip(p=0.5),
         transforms.RandomAffine(degrees=0, scale=(0.9, 1.1)),
         transforms.ColorJitter(brightness=0.2, contrast=0.2),
@@ -41,7 +40,6 @@ def _get_transforms():
     ])
 
     eval_transform = transforms.Compose([
-        transforms.Resize((IMG_SIZE, IMG_SIZE)),
         transforms.ToTensor(),
         transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
     ])
@@ -70,7 +68,7 @@ def get_dataloaders(
     data_dir=DATA_SCALOGRAMS,
     batch_size=BATCH_SIZE,
     seed=RANDOM_SEED,
-    num_workers=0,
+    num_workers=4,
 ):
     """Build train / val / test DataLoaders with stratified splits.
 
@@ -123,15 +121,15 @@ def get_dataloaders(
 
     train_loader = DataLoader(
         train_set, batch_size=batch_size, shuffle=True,
-        num_workers=num_workers, pin_memory=True,
+        num_workers=num_workers, pin_memory=False,
     )
     val_loader = DataLoader(
         val_set, batch_size=batch_size, shuffle=False,
-        num_workers=num_workers, pin_memory=True,
+        num_workers=num_workers, pin_memory=False,
     )
     test_loader = DataLoader(
         test_set, batch_size=batch_size, shuffle=False,
-        num_workers=num_workers, pin_memory=True,
+        num_workers=num_workers, pin_memory=False,
     )
 
     return train_loader, val_loader, test_loader, class_names
