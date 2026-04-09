@@ -5,11 +5,12 @@ data/
 
 # ==========================================
 # Model checkpoints & results artifacts
+# (Commented out so they upload to GitHub!)
 # ==========================================
-results/*.pth
-results/*.png
-results/*.json
-results/*.txt
+# results/*.pth
+# results/*.png
+# results/*.json
+# results/*.txt
 
 # ==========================================
 # Python
@@ -29,7 +30,7 @@ build/
 # ==========================================
 venv/
 env/
-.env/
+.env
 .venv/
 
 # ==========================================
