@@ -1,0 +1,758 @@
+\documentclass[12pt,a4paper]{article}
+
+% ─── Packages ──────────────────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{bm}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{abstract}
+\usepackage{parskip}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{enumitem}
+
+% ─── Colours ───────────────────────────────────────────────────
+\definecolor{myblue}{RGB}{30,90,160}
+\definecolor{mygray}{RGB}{245,245,245}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+
+% ─── Hyperref setup ────────────────────────────────────────────
+\hypersetup{
+    colorlinks=true,
+    linkcolor=myblue,
+    citecolor=myblue,
+    urlcolor=myblue,
+    pdftitle={ECG Arrhythmia Detection using Deep Learning},
+    pdfauthor={Revant S.},
+}
+
+% ─── Header / Footer ───────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead[L]{\small ECG Arrhythmia Detection via Deep Learning}
+\fancyhead[R]{\small \thepage}
+\fancyfoot[C]{\small Biomedical Instrumentation Project Report}
+
+% ─── Section formatting ────────────────────────────────────────
+\titleformat{\section}{\large\bfseries\color{myblue}}{{\thesection}}{1em}{}[\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries}{{\thesubsection}}{1em}{}
+
+% ─── Code listing style ────────────────────────────────────────
+\lstset{
+    backgroundcolor=\color{mygray},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    captionpos=b,
+    commentstyle=\color{codegray},
+    keywordstyle=\color{myblue}\bfseries,
+    stringstyle=\color{codepurple},
+    numbers=left,
+    numberstyle=\tiny\color{codegray},
+    numbersep=5pt,
+    frame=single,
+    framerule=0.4pt,
+    language=Python,
+    showstringspaces=false,
+    tabsize=4,
+}
+
+% ═══════════════════════════════════════════════════════════════
+\begin{document}
+% ═══════════════════════════════════════════════════════════════
+
+% ─── Title page ────────────────────────────────────────────────
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    {\LARGE\bfseries\color{myblue}
+        Deep Learning-Based Arrhythmia Detection\\[0.4em]
+        from ECG Signals\\[0.4em]
+        \large A Comparative Study of Custom CNN vs.\ Transfer Learning
+    \par}
+    \vspace{1cm}
+    \rule{\textwidth}{1.5pt}
+    \vspace{0.5cm}
+
+    {\large\bfseries Biomedical Instrumentation --- Project Report\par}
+    \vspace{1.5cm}
+
+    {\normalsize
+        \textbf{Author:} Revant S.\\[0.3em]
+        \textbf{Dataset:} MIT-BIH Arrhythmia Database (PhysioNet)\\[0.3em]
+        \textbf{Framework:} PyTorch 2.x \quad GPU: NVIDIA T4 (Google Colab)\\[0.3em]
+        \textbf{Date:} April 2026
+    \par}
+    \vspace{2cm}
+
+    \begin{abstract}
+        \noindent
+        This report presents an end-to-end deep learning pipeline for binary
+        classification of cardiac arrhythmias from standard 12-lead ECG signals.
+        Individual heartbeats are extracted from the MIT-BIH Arrhythmia Database
+        and transformed into two-dimensional time-frequency scalograms using the
+        Continuous Wavelet Transform (CWT) with the Morlet wavelet.  Two
+        convolutional neural network (CNN) architectures are trained and evaluated
+        on the resulting image representation: (1)~\textbf{SmallNet}, a custom
+        lightweight 21-layer CNN with only 3{,}754 trainable parameters, and
+        (2)~\textbf{GoogLeNet}, a pre-trained Inception-v1 network fine-tuned
+        via transfer learning with 5{,}601{,}954 parameters.  On a balanced
+        test set of 3{,}178 heartbeats, SmallNet achieves an AUC of 82.41\%
+        after 12 epochs of CPU training, while GoogLeNet achieves a test
+        accuracy of \textbf{95.81\%}, sensitivity of \textbf{96.73\%}, and an
+        AUC of \textbf{98.92\%} after 25 GPU epochs.  The results demonstrate
+        that the CWT-scalogram approach bridges the gap between 1D biomedical
+        signal processing and powerful 2D image classification networks,
+        yielding clinically relevant detection performance.
+    \end{abstract}
+
+    \vfill
+    \rule{\textwidth}{0.5pt}
+    {\small All source code is available at:
+    \url{https://github.com/Revant-S/BMI_Project}}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ═══════════════════════════════════════════════════════════════
+\section{Introduction}
+% ═══════════════════════════════════════════════════════════════
+
+Cardiovascular disease (CVD) is the leading cause of mortality worldwide,
+accounting for approximately 17.9~million deaths annually according to the
+World Health Organisation~\cite{who2021cvd}.  Cardiac arrhythmias---irregular
+electrical patterns in the heart---are a major contributor to sudden cardiac
+arrest and stroke, yet are often asymptomatic and missed in routine check-ups.
+The Electrocardiogram (ECG) is the gold-standard non-invasive tool for detecting
+arrhythmias; however, manual interpretation of continuous ECG recordings is
+time-consuming, requires expert cardiologist skill, and is prone to inter-rater
+variability.
+
+Automated arrhythmia detection using machine learning has therefore attracted
+significant academic and clinical interest.  Traditional approaches rely on
+hand-crafted morphological and statistical features extracted from the R-peak,
+QRS complex, and T-wave segments~\cite{de2004automatic}.  Deep learning, in
+contrast, enables end-to-end feature learning directly from raw or
+lightly-processed signals.
+
+A particularly powerful paradigm is to convert the 1D ECG signal into a 2D
+time-frequency image using a wavelet transform, then apply a convolutional
+neural network (CNN) designed for image classification~\cite{wang2019ecg}.
+This approach combines the rich temporal and spectral information captured by
+wavelets with the mature toolset of 2D CNNs---including readily available
+pre-trained networks trained on millions of images (transfer learning).
+
+\subsection{Objectives}
+
+\begin{enumerate}[leftmargin=*]
+    \item Implement a complete, reproducible pipeline that goes from raw
+          MIT-BIH recordings to trained classifiers and evaluation plots.
+    \item Convert 1D heartbeat windows into 2D Morlet scalograms and study
+          their discriminative quality.
+    \item Design and evaluate \textbf{SmallNet}---a custom, resource-efficient
+          CNN---as a lightweight clinical-deployment candidate.
+    \item Fine-tune \textbf{GoogLeNet} (Inception-v1) via transfer learning as
+          a high-accuracy upper-bound reference.
+    \item Quantitatively compare both models using clinical metrics:
+          Sensitivity, Specificity, Precision, F1-Score, and AUC.
+\end{enumerate}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Background \& Theory}
+% ═══════════════════════════════════════════════════════════════
+
+\subsection{The ECG Signal}
+
+The electrocardiogram records the electrical activity of the heart over time.
+A single cardiac cycle produces the characteristic PQRST waveform:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{P-wave}: Atrial depolarisation.
+    \item \textbf{QRS complex}: Rapid ventricular depolarisation (the R-peak is
+          the sharp positive deflection).
+    \item \textbf{T-wave}: Ventricular repolarisation.
+\end{itemize}
+Arrhythmias manifest as deviations in the timing, shape, or amplitude of these
+components.  The MIT-BIH database records signals at $f_s = 360$~Hz with 11-bit
+resolution over a $\pm 5$~mV range~\cite{moody2001mitbih}.
+
+\subsection{Beat Segmentation and AAMI Standard}
+
+Individual heartbeats are extracted by locating the R-peak (using ground-truth
+annotations provided by cardiologists) and taking a fixed window of
+$90 + 160 = 250$ samples ($\approx 694$~ms) centred slightly left of the peak
+to capture the pre-excitation onset and the full repolarisation tail.
+
+The Association for the Advancement of Medical Instrumentation (AAMI) EC57
+standard \cite{aami2012} defines a recommended label taxonomy for arrhythmia
+detectors:
+\begin{description}[leftmargin=3em, labelwidth=1.5em]
+    \item[N] Normal and bundle-branch block beats
+          (\texttt{N, L, R, e, j}).
+    \item[S] Supraventricular ectopic beats
+          (\texttt{A, a, J, S}).
+    \item[V] Ventricular ectopic beats
+          (\texttt{V, E}).
+    \item[F] Fusion beats (\texttt{F}).
+    \item[Q] Unclassifiable or paced beats (excluded from training).
+\end{description}
+We follow the standard and merge classes S, V, and F into a single
+\emph{Abnormal} label, resulting in a binary classification task: Normal vs.\
+Abnormal.  Records 102, 104, 107, and 217 are excluded because they contain
+paced beats that carry pacemaker artifact morphology unrepresentative of natural
+rhythms.
+
+\subsection{Class Imbalance}
+
+The MIT-BIH database is heavily imbalanced: $\approx 90{,}000$ normal beats
+versus $\approx 10{,}500$ abnormal beats (8.5:1 ratio).  Training a classifier
+on unbalanced data biases it toward predicting the majority class.  We apply
+\textbf{random undersampling} of the majority (Normal) class to obtain a
+perfectly balanced dataset of $10{,}591 + 10{,}591 = 21{,}182$ beats.
+
+\subsection{Continuous Wavelet Transform (CWT)}
+
+The Continuous Wavelet Transform decomposes a signal $x(t)$ into a
+two-dimensional time-scale (time-frequency) representation:
+\begin{equation}
+    W(a, b) = \frac{1}{\sqrt{|a|}} \int_{-\infty}^{\infty}
+              x(t)\,\psi^*\!\left(\frac{t - b}{a}\right) dt
+    \label{eq:cwt}
+\end{equation}
+where $\psi$ is the \emph{mother wavelet}, $a > 0$ is the scale parameter
+(inversely proportional to frequency), and $b$ is the translation (time offset).
+The resulting matrix $W(a, b)$ is called a \textbf{scalogram}.
+
+The \textbf{Morlet wavelet} (complex sinusoid modulated by a Gaussian) is
+chosen because its shape closely resembles the QRS complex, providing optimal
+time-frequency resolution for cardiac signals~\cite{addison2005wavelet}:
+\begin{equation}
+    \psi(t) = \pi^{-1/4} e^{i\omega_0 t} e^{-t^2/2}
+    \label{eq:morlet}
+\end{equation}
+We compute scales $a \in [1, 127]$ (127 frequency bands), producing a
+$127 \times 250$ matrix per beat.  This matrix is colour-mapped and resized to
+$224 \times 224$ pixels to match the input dimensions expected by standard CNN
+architectures.
+
+\subsection{Convolutional Neural Networks}
+
+A CNN applies a series of learnable convolutional filters to extract spatial
+feature hierarchies from an input image.  For an input volume $\mathbf{X}$ and
+filter bank $\mathbf{W}$, the output of a convolutional layer with bias $b$ and
+activation $\sigma$ is:
+\begin{equation}
+    \mathbf{Y}_{i,j,k} = \sigma\!\left(
+        \sum_{m}\sum_{p}\sum_{q} W_{m,p,q,k} \cdot X_{i+p-1,\, j+q-1,\, m}
+        + b_k \right)
+    \label{eq:conv}
+\end{equation}
+Batch Normalisation~\cite{ioffe2015batchnorm} and ReLU activations are applied
+after each convolutional layer to stabilise training and introduce
+non-linearity.  Max-Pooling downsamples the feature maps to progressively
+increase the effective receptive field.
+
+\subsection{Transfer Learning}
+
+Transfer learning reuses weight representations learned on a large source task
+(ImageNet, $\approx 1.28$~million images, 1000 classes \cite{deng2009imagenet})
+and fine-tunes them on a target domain with limited labelled data
+\cite{pan2010transfer}.  The rationale is that low-level filters learned on
+natural images (edge detectors, texture analysers) are universally useful, even
+for medical scalogram images.  Only the final fully-connected head is replaced
+to output two classes (Normal / Abnormal).
+
+% ═══════════════════════════════════════════════════════════════
+\section{Dataset}
+% ═══════════════════════════════════════════════════════════════
+
+\subsection{MIT-BIH Arrhythmia Database}
+
+The MIT-BIH Arrhythmia Database~\cite{moody2001mitbih} was created in 1980 at
+the Massachusetts Institute of Technology and Beth Israel Hospital (now BIDMC).
+It is freely available via PhysioNet~\cite{goldberger2000physiobank} and
+remains the most widely replicated benchmark for arrhythmia detection research,
+having been cited in more than 5{,}000 peer-reviewed publications.
+
+\begin{table}[H]
+\centering
+\caption{MIT-BIH Arrhythmia Database summary.}
+\label{tab:mitbih}
+\begin{tabular}{ll}
+    \toprule
+    \textbf{Property} & \textbf{Value} \\
+    \midrule
+    Number of half-hour recordings & 48 \\
+    Subjects & 47 (25 male, 22 female; age 23--89) \\
+    Sampling frequency & 360 Hz \\
+    Signal duration per record & $\approx$30 minutes (650{,}000 samples) \\
+    Number of ECG leads & 2 (MLII primary, V5 secondary) \\
+    ADC resolution & 11-bit over $\pm 5$ mV \\
+    Total annotated beats & $>110{,}000$ \\
+    Annotation method & Two independent cardiologists \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Annotation Distribution}
+
+Table~\ref{tab:annotations} shows the beat-level annotation counts across the
+44 records used in this study (4 paced-beat records excluded).
+
+\begin{table}[H]
+\centering
+\caption{Beat annotation counts across 44 MIT-BIH records.}
+\label{tab:annotations}
+\begin{tabular}{clrr}
+    \toprule
+    \textbf{AAMI Class} & \textbf{Symbol} & \textbf{Description} & \textbf{Count} \\
+    \midrule
+    \multirow{5}{*}{Normal (N)}
+        & N  & Normal sinus beat        & 74{,}546 \\
+        & L  & Left bundle branch block & 8{,}075 \\
+        & R  & Right bundle branch block& 7{,}259 \\
+        & j  & Nodal escape beat        & 229 \\
+        & e  & Atrial escape beat       & 16 \\
+    \midrule
+    \multirow{6}{*}{Abnormal (S/V/F)}
+        & V  & Premature ventricular contraction & 6{,}903 \\
+        & A  & Atrial premature beat             & 2{,}546 \\
+        & F  & Fusion beat                       & 803 \\
+        & a  & Aberrated atrial premature beat   & 150 \\
+        & E  & Ventricular escape beat           & 106 \\
+        & J,S& Nodal / supraventricular premature& 85 \\
+    \midrule
+    \multicolumn{3}{l}{\textbf{Total Normal (pre-balance)}}  & \textbf{90{,}125} \\
+    \multicolumn{3}{l}{\textbf{Total Abnormal (pre-balance)}}& \textbf{10{,}593} \\
+    \multicolumn{3}{l}{\textbf{After undersampling (1:1)}}   & \textbf{21{,}182} \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Methodology}
+% ═══════════════════════════════════════════════════════════════
+
+\subsection{Pipeline Overview}
+
+The complete processing pipeline is depicted in Figure~\ref{fig:pipeline}.
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{c}
+\texttt{
+\footnotesize
+PhysioNet MIT-BIH (48 records) $\longrightarrow$ [download\_data.py] $\longrightarrow$ \\[2pt]
+Beat Extraction (extract\_beats.py) $\longrightarrow$ \\[2pt]
+CWT Scalograms 224$\times$224 px (build\_scalograms.py) $\longrightarrow$ \\[2pt]
+DataLoaders 70/15/15 split (dataset.py) $\longrightarrow$ \\[2pt]
+Model Training (train.py) $\longrightarrow$ Evaluation (generate\_results.py)
+}
+\end{tabular}
+\caption{End-to-end ECG arrhythmia detection pipeline.}
+\label{fig:pipeline}
+\end{figure}
+
+\subsection{Beat Extraction}
+
+Algorithm~\ref{alg:beat} summarises the beat extraction procedure.
+
+\begin{lstlisting}[caption={Beat extraction from a single MIT-BIH record.},label=alg:beat,language=Python]
+for record_id in ALL_RECORDS:
+    record  = wfdb.rdrecord(record_id)      # load signal (650,000 x 2)
+    ann     = wfdb.rdann(record_id, 'atr')  # load annotation
+    signal  = record.p_signal[:, 0]         # MLII lead only
+
+    for i, (sample, symbol) in enumerate(zip(ann.sample, ann.symbol)):
+        if symbol in NORMAL_LABELS:
+            label = 0
+        elif symbol in ABNORMAL_LABELS:
+            label = 1
+        else:
+            continue                         # skip non-beat annotations
+
+        # Extract fixed window around R-peak
+        start = sample - WINDOW_BEFORE       # 90 samples before
+        end   = sample + WINDOW_AFTER        # 160 samples after
+        if start < 0 or end > len(signal):
+            continue
+        beats.append(signal[start:end])      # 250-sample window
+        labels.append(label)
+
+# Undersample majority class for 1:1 balance
+beats, labels = balance_classes(beats, labels)
+\end{lstlisting}
+
+\subsection{CWT Scalogram Generation}
+
+For each 250-sample beat vector, the PyWavelets library computes the CWT:
+\begin{equation}
+    \text{scales} = [1, 2, \ldots, 127], \quad \psi = \text{Morlet}
+\end{equation}
+The resulting $127 \times 250$ coefficient matrix is logarithmically normalised,
+colour-mapped using matplotlib's \texttt{jet} palette, and resized to
+$224 \times 224 \times 3$ RGB pixels.  Scalograms are pre-saved to disk as PNG
+files ($\approx 24$~KB each, $\approx 500$~MB total) to decouple the
+computationally expensive wavelet step from training data loading.
+
+\subsection{Dataset Splits and Augmentation}
+
+A stratified random split (seed $= 42$) partitions the 21{,}182 scalograms
+into:
+\[
+    \text{Train}: 14{,}827 \;(70\%) \quad
+    \text{Validation}: 3{,}177 \;(15\%) \quad
+    \text{Test}: 3{,}178 \;(15\%)
+\]
+Training images receive online augmentation:
+\begin{itemize}[leftmargin=*]
+    \item Random vertical flip ($p = 0.5$).
+    \item Random affine scaling ($\times 0.9$--$\times 1.1$).
+    \item Colour jitter (brightness/contrast $\pm 20\%$).
+\end{itemize}
+All images are normalised to ImageNet statistics
+($\mu = [0.485, 0.456, 0.406]$, $\sigma = [0.229, 0.224, 0.225]$) so that
+GoogLeNet's pre-trained filters operate in their expected input domain.
+
+\subsection{SmallNet Architecture}
+
+SmallNet is an intentionally compact CNN inspired by the principle that a
+well-regularised, domain-specific model can outperform heavyweight architectures
+when data volume is limited or inference speed is a clinical priority.
+
+\begin{table}[H]
+\centering
+\caption{SmallNet layer-by-layer architecture.}
+\label{tab:smallnet}
+\begin{tabular}{llll}
+    \toprule
+    \textbf{Block} & \textbf{Operation} & \textbf{Output size} & \textbf{Filters / Units} \\
+    \midrule
+    Block 1 & Conv3$\times$3 -- BN -- ReLU -- MaxPool & $112\times112$ & 16 \\
+    Block 2 & Conv3$\times$3 -- BN -- ReLU -- MaxPool & $56\times56$   & 4 \\
+    Block 3 & Conv3$\times$3 -- BN -- ReLU -- MaxPool & $28\times28$   & 8 \\
+    Block 4 & Conv3$\times$3 -- BN -- ReLU -- MaxPool & $14\times14$   & 16 \\
+    Head    & AdaptiveAvgPool $\rightarrow$ Flatten   & $16$           & --- \\
+            & Linear -- ReLU -- Dropout(0.5)          & $64$           & 64 \\
+            & Linear (output)                         & $2$            & 2 \\
+    \midrule
+    \multicolumn{3}{l}{\textbf{Total trainable parameters}} & \textbf{3{,}754} \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{GoogLeNet (Inception-v1) Architecture}
+
+GoogLeNet~\cite{szegedy2015goingdeeper} was proposed by Szegedy et al.\ in
+2014 and won the ILSVRC 2014 image classification challenge.  Key design
+elements include:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Inception modules}: Parallel branches of $1\times1$,
+          $3\times3$, $5\times5$ convolutions and max-pooling, concatenated
+          channel-wise to capture multi-scale features.
+    \item \textbf{Auxiliary classifiers}: Two intermediate classification heads
+          (AuxClassifier 1 and 2) that inject gradient signals deep into the
+          network, reducing vanishing-gradient problems during training.
+    \item \textbf{Global Average Pooling}: Replaces the large fully-connected
+          layers used in AlexNet/VGG, drastically reducing parameter count.
+\end{itemize}
+
+For our binary classification task, the final fully-connected layer is replaced:
+\[
+    \text{FC}(1024 \rightarrow 1000) \;\longrightarrow\;
+    \text{FC}(1024 \rightarrow 2)
+\]
+The auxiliary heads are similarly adapted ($\text{FC}(\cdot \rightarrow 2)$).
+During training, the total loss is:
+\begin{equation}
+    \mathcal{L} = \mathcal{L}_\text{main} +
+                  0.3\,\mathcal{L}_\text{aux1} +
+                  0.3\,\mathcal{L}_\text{aux2}
+    \label{eq:googleloss}
+\end{equation}
+
+\begin{table}[H]
+\centering
+\caption{GoogLeNet key properties.}
+\label{tab:googlenet}
+\begin{tabular}{ll}
+    \toprule
+    \textbf{Property} & \textbf{Value} \\
+    \midrule
+    Base architecture & Inception-v1 (GoogLeNet) \\
+    Pre-training & ImageNet (1.28M images, 1000 classes) \\
+    Inception modules & 9 \\
+    Auxiliary classifiers & 2 \\
+    Total depth & 22 layers \\
+    Total trainable parameters & 5{,}601{,}954 \\
+    Input size & $224\times224\times3$ \\
+    Output classes & 2 (Normal / Abnormal) \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Training Configuration}
+
+Both models are trained with identical optimiser settings to ensure a fair
+comparison.
+
+\begin{table}[H]
+\centering
+\caption{Shared training hyperparameters.}
+\label{tab:hyperparams}
+\begin{tabular}{ll}
+    \toprule
+    \textbf{Hyperparameter} & \textbf{Value} \\
+    \midrule
+    Optimiser         & SGD with momentum \\
+    Learning rate     & $\eta = 1 \times 10^{-4}$ \\
+    Momentum          & 0.9 \\
+    Loss function     & Cross-Entropy \\
+    Batch size        & 32 \\
+    Max epochs        & 50 (with early stopping) \\
+    Early stop patience & 10 epochs \\
+    Random seed       & 42 \\
+    Hardware          & NVIDIA T4 GPU (Google Colab, 15 GB VRAM) \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Experiments \& Results}
+% ═══════════════════════════════════════════════════════════════
+
+\subsection{SmallNet Training}
+
+SmallNet was trained for 12 epochs; the best validation checkpoint was saved at
+epoch 2 (val\_acc $= 76.14\%$).  After epoch 2 the validation accuracy
+plateaued between 70--76\%, indicating that the model's capacity (3{,}754
+parameters) was saturated---the 4-block feature extractor exhausted its ability
+to discriminate the complex multi-scale wavelet patterns.
+
+\begin{table}[H]
+\centering
+\caption{SmallNet training progression (selected epochs).}
+\label{tab:smallnet_hist}
+\begin{tabular}{crrrr}
+    \toprule
+    \textbf{Epoch} & \textbf{Train Loss} & \textbf{Train Acc (\%)} &
+    \textbf{Val Loss} & \textbf{Val Acc (\%)} \\
+    \midrule
+    1  & 0.7015 & 50.53 & 0.6884 & 49.98 \\
+    2  & 0.6954 & 51.50 & 0.6850 & \textbf{76.14} \\
+    4  & 0.6867 & 54.31 & 0.6745 & 70.16 \\
+    6  & 0.6716 & 60.79 & 0.6588 & 70.07 \\
+    8  & 0.6552 & 64.92 & 0.6393 & 73.15 \\
+    10 & 0.6427 & 66.65 & 0.6208 & 72.77 \\
+    12 & 0.6302 & 67.92 & 0.6020 & 71.92 \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{GoogLeNet Training}
+
+GoogLeNet converged smoothly over 25 epochs.  Transfer learning from ImageNet
+provided a powerful feature initialisation: validation accuracy crossed 90\%
+within 5 epochs and reached 95.85\% by epoch 25.
+
+\begin{table}[H]
+\centering
+\caption{GoogLeNet training progression (selected epochs).}
+\label{tab:googlenet_hist}
+\begin{tabular}{crrrr}
+    \toprule
+    \textbf{Epoch} & \textbf{Train Loss} & \textbf{Train Acc (\%)} &
+    \textbf{Val Loss} & \textbf{Val Acc (\%)} \\
+    \midrule
+    1  & 0.5916 & 70.43 & 0.4799 & 81.11 \\
+    5  & 0.3148 & 86.83 & 0.2555 & 90.24 \\
+    10 & 0.2257 & 91.45 & 0.1741 & 93.26 \\
+    15 & 0.1848 & 93.07 & 0.1441 & 94.52 \\
+    20 & 0.1560 & 94.25 & 0.1247 & 95.56 \\
+    25 & 0.1387 & 94.94 & 0.1183 & \textbf{95.85} \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Test Set Performance}
+
+Table~\ref{tab:results} presents the final evaluation on the held-out test set
+(3{,}178 samples, equal class balance).
+
+\begin{table}[H]
+\centering
+\caption{Test set performance comparison.}
+\label{tab:results}
+\begin{tabular}{lcc}
+    \toprule
+    \textbf{Metric} & \textbf{SmallNet} & \textbf{GoogLeNet} \\
+    \midrule
+    Accuracy (\%)    & 75.77 & \textbf{95.81} \\
+    Sensitivity (\%) & 79.36 & \textbf{96.73} \\
+    Specificity (\%) & 72.18 & \textbf{94.90} \\
+    Precision (\%)   & 74.05 & \textbf{94.99} \\
+    F1-Score (\%)    & 76.61 & \textbf{95.85} \\
+    AUC (\%)         & 82.41 & \textbf{98.92} \\
+    \midrule
+    True Positives   & 1{,}261 & 1{,}537 \\
+    True Negatives   & 1{,}147 & 1{,}508 \\
+    False Positives  & 442     & 81 \\
+    False Negatives  & 328     & 52 \\
+    \midrule
+    Trainable Params & 3{,}754 & 5{,}601{,}954 \\
+    Training Epochs  & 12 (CPU) & 25 (GPU) \\
+    \bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Discussion}
+
+\paragraph{GoogLeNet performance.}
+GoogLeNet's 98.92\% AUC demonstrates near-perfect class separation on the
+test set.  The high sensitivity (96.73\%) is especially important in medical
+screening: out of 1{,}589 truly abnormal beats in the test set, only 52 were
+missed (False Negatives).  The low false-negative rate is critical in clinical
+practice where missed arrhythmias can be life-threatening.
+
+\paragraph{SmallNet analysis.}
+SmallNet's plateau at $\approx 76\%$ accuracy illustrates the classical
+\emph{capacity bottleneck} problem.  With only 3{,}754 parameters, the network
+is fundamentally limited in the complexity of the decision boundary it can
+representl.  Nonetheless, its 82.41\% AUC indicates it has learned a
+statistically meaningful discrimination between Normal and Abnormal scalogram
+patterns---a remarkable result given its minimal computational budget.
+
+\paragraph{Intra-patient vs.\ inter-patient evaluation.}
+A key limitation of the current evaluation is the use of an
+\emph{intra-patient} split: beats from the same patient may appear in both the
+training and test sets.  Since individual heartbeat morphology has a
+patient-specific ``fingerprint'', the model can leverage this memorisation to
+inflate accuracy.  Published results using an \emph{inter-patient} split
+(training on a disjoint set of patients from the test set) typically report
+5--10 percentage points lower accuracy.  A rigorous clinical evaluation would
+require the inter-patient protocol.
+
+% ═══════════════════════════════════════════════════════════════
+\section{Conclusion}
+% ═══════════════════════════════════════════════════════════════
+
+This project presents a complete, modular, and reproducible pipeline for binary
+ECG arrhythmia classification.  The key contribution is the application of the
+Continuous Wavelet Transform to convert 1D heartbeat signals into
+two-dimensional Morlet scalogram images, enabling the direct application of
+powerful image CNN architectures.
+
+GoogLeNet, fine-tuned via transfer learning, achieves clinically relevant
+performance: 95.81\% accuracy, 96.73\% sensitivity, and 98.92\% AUC on the
+balanced MIT-BIH test set.  SmallNet, with only 3{,}754 parameters, provides a
+lightweight baseline that can serve as a starting point for resource-constrained
+embedded medical devices.
+
+\paragraph{Future work.}
+\begin{itemize}[leftmargin=*]
+    \item Adopt a strict \emph{inter-patient} train/test split following the
+          AAMI DS1/DS2 protocol for more realistic generalisation estimates.
+    \item Explore multi-class classification beyond binary Normal/Abnormal.
+    \item Investigate model compression techniques (pruning, quantisation) to
+          deploy SmallNet on microcontrollers.
+    \item Integrate Grad-CAM visualisations to interpret which scalogram
+          regions are driving the GoogLeNet predictions.
+    \item Extend the dataset with additional PhysioNet databases (e.g.,
+          INCART, European ST-T) to improve generalisation.
+\end{itemize}
+
+% ═══════════════════════════════════════════════════════════════
+\section*{Acknowledgements}
+% ═══════════════════════════════════════════════════════════════
+
+\noindent
+The MIT-BIH Arrhythmia Database was obtained from PhysioNet
+(\url{https://physionet.org/content/mitdb/}).  Model training was performed
+on Google Colab's free-tier NVIDIA T4 GPU.  The PyTorch, torchvision,
+PyWavelets, wfdb, scikit-learn, and matplotlib open-source libraries were
+used throughout.
+
+% ═══════════════════════════════════════════════════════════════
+\bibliographystyle{plainnat}
+\begin{thebibliography}{99}
+
+\bibitem{who2021cvd}
+World Health Organization (2021).
+\textit{Cardiovascular diseases (CVDs) fact sheet}.
+\url{https://www.who.int/news-room/fact-sheets/detail/cardiovascular-diseases-(cvds)}
+
+\bibitem{de2004automatic}
+de~Chazal, P., O'Dwyer, M., and Reilly, R.~B. (2004).
+Automatic classification of heartbeats using ECG morphology and heartbeat
+interval features.
+\textit{IEEE Transactions on Biomedical Engineering}, 51(7):1196--1206.
+
+\bibitem{wang2019ecg}
+Wang, T., Lu, C., Sun, Y., Yang, M., Liu, C., and Ou, C. (2019).
+Automatic ECG classification using continuous wavelet transform and
+convolutional neural network.
+\textit{Entropy}, 23(1):119.
+
+\bibitem{moody2001mitbih}
+Moody, G.~B. and Mark, R.~G. (2001).
+The impact of the MIT-BIH arrhythmia database.
+\textit{IEEE Engineering in Medicine and Biology Magazine}, 20(3):45--50.
+
+\bibitem{goldberger2000physiobank}
+Goldberger, A.~L. et al.\ (2000).
+PhysioBank, PhysioToolkit, and PhysioNet: Components of a new research resource
+for complex physiologic signals.
+\textit{Circulation}, 101(23):e215--e220.
+
+\bibitem{aami2012}
+ANSI/AAMI EC57:2012.
+\textit{Testing and reporting performance results of cardiac rhythm and ST
+segment measurement algorithms}.
+Association for the Advancement of Medical Instrumentation, Arlington, VA.
+
+\bibitem{addison2005wavelet}
+Addison, P.~S. (2005).
+\textit{Wavelet transforms and the ECG: A review}.
+\textit{Physiological Measurement}, 26(5):R155--R199.
+
+\bibitem{ioffe2015batchnorm}
+Ioffe, S. and Szegedy, C. (2015).
+Batch normalization: Accelerating deep network training by reducing internal
+covariate shift.
+\textit{Proceedings of ICML}, 37:448--456.
+
+\bibitem{deng2009imagenet}
+Deng, J. et al.\ (2009).
+ImageNet: A large-scale hierarchical image database.
+\textit{IEEE CVPR}, 248--255.
+
+\bibitem{pan2010transfer}
+Pan, S. J. and Yang, Q. (2010).
+A survey on transfer learning.
+\textit{IEEE Transactions on Knowledge and Data Engineering},
+22(10):1345--1359.
+
+\bibitem{szegedy2015goingdeeper}
+Szegedy, C. et al.\ (2015).
+Going deeper with convolutions.
+\textit{IEEE CVPR}, 1--9.
+
+\end{thebibliography}
+
+\end{document}
