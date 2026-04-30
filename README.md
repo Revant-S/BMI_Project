@@ -1,92 +1,123 @@
-# ECG Arrhythmia Detection using Deep Learning
+# Deep Learning-Based Arrhythmia Detection from ECG Signals 🫀
 
-Binary classification of heartbeats as **Normal** or **Abnormal** using CWT scalograms and CNNs.
+![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=flat&logo=PyTorch&logoColor=white)
+![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-## Pipeline Overview
+An end-to-end deep learning pipeline for the binary classification of cardiac arrhythmias (Normal vs. Abnormal) using standard 12-lead ECG signals. 
 
-```
-MIT-BIH ECG Signals → Beat Extraction → CWT Scalograms → CNN Classification
-                         (1D)              (2D images)       (SmallNet / GoogLeNet)
-```
+This project transforms 1D Electrocardiogram (ECG) time-series data into 2D time-frequency images (Scalograms) using the **Continuous Wavelet Transform (CWT)** with a Morlet wavelet. These rich visual representations are then classified using powerful Convolutional Neural Networks (CNNs).
 
-## Quick Start
+<div align="center">
+  <img src="results/dashboard_googlenet.png" alt="GoogLeNet Results Dashboard" width="800">
+</div>
 
-### 1. Install dependencies
-```bash
-pip install -r requirements.txt
-```
+---
 
-### 2. Download MIT-BIH data
-```bash
-python -m src.download_data
-```
+## 🚀 Key Features & Methodologies
 
-### 3. Extract heartbeats
-```bash
-python -m src.extract_beats
-```
+1. **Automated Data Acquisition**: Automatically downloads and parses the widely recognized **MIT-BIH Arrhythmia Database** (48 records) from PhysioNet.
+2. **Standardized Extraction**: Extracts individual heartbeats using a fixed 250-sample window around the R-peak (90 samples before, 160 after).
+3. **Class Balancing**: Eliminates the heavy natural bias of normal heartbeats by applying 1:1 undersampling, resulting in a perfectly balanced dataset of **21,182 beats**.
+4. **2D Scalogram Generation**: Converts 1D signals into `224x224` RGB images using 127 Morlet wavelet scales, processed via high-speed multiprocessing.
+5. **Deep Learning Architectures**:
+   - **SmallNet**: A custom, incredibly lightweight 21-layer CNN feature extractor (~3,700 parameters) designed for clinical edge-device deployment.
+   - **GoogLeNet**: A massive pre-trained Inception-v1 network fine-tuned via Transfer Learning (~5.6M parameters) to serve as a high-accuracy clinical upper-bound.
 
-### 4. Generate scalograms
-```bash
-python -m src.build_scalograms --workers 4
-```
+---
 
-### 5. Train a model
-```bash
-# SmallNet (lightweight, ~5K params)
-python -m src.train --model smallnet --epochs 50
+## 📈 Performance Results
 
-# GoogLeNet (transfer learning, ~6.8M params)
-python -m src.train --model googlenet --epochs 50
-```
+Evaluated on a completely unseen, stratified test set of **3,178 heartbeats** with strict class balance.
 
-### 6. Evaluate
-```bash
-python -m src.evaluate --model smallnet
-python -m src.evaluate --model googlenet
-python -m src.evaluate --compare
-```
+| Metric | GoogLeNet (25 Epochs) | SmallNet (12 Epochs) |
+| :--- | :---: | :---: |
+| **Accuracy** | **95.81%** | 75.77% |
+| **Sensitivity (Recall)** | **96.73%** | 79.36% |
+| **Specificity** | **94.90%** | 72.18% |
+| **F1 Score** | **95.85%** | 76.61% |
+| **ROC AUC** | **98.92%** | 82.41% |
 
-## Project Structure
-```
-BMI/
-├── data/
-│   ├── raw/                  # MIT-BIH .dat, .hea, .atr files
-│   ├── processed/            # NumPy arrays (beats.npy, labels.npy)
-│   └── scalograms/           # 224×224 RGB PNG images
-│       ├── Normal/
-│       └── Abnormal/
-├── notebooks/
-│   └── 01_data_exploration.ipynb
-├── src/
-│   ├── __init__.py
-│   ├── config.py             # Central configuration
-│   ├── download_data.py      # MIT-BIH downloader
-│   ├── extract_beats.py      # Beat extraction & balancing
-│   ├── build_scalograms.py   # CWT scalogram generation
-│   ├── dataset.py            # PyTorch DataLoaders
-│   ├── model.py              # SmallNet + GoogLeNet
-│   ├── train.py              # Training loop
-│   └── evaluate.py           # Evaluation & metrics
-├── results/                  # Checkpoints, plots, metrics
-├── requirements.txt
-└── README.md
+*GoogLeNet achieved a highly clinically relevant Sensitivity rate, missing only 52 abnormal beats out of 1,589 total true abnormalities.*
+
+---
+
+## 📂 Project Structure
+
+```text
+BMI_Project/
+├── data/                       # (Git-ignored) Raw MIT-BIH, processed CSVs, Scalogram PNGs
+├── notebooks/                  
+│   ├── colab_training.ipynb    # 1-Click Google Colab Automated GPU Training
+│   └── 01_data_exploration...  # Exploratory data analysis
+├── report/                     
+│   └── ecg_arrhythmia_report.tex # Complete LaTeX Project Documentation
+├── results/                    # Saved .pth weights, metrics, and generated PNG charts
+├── src/                        # Core Pipeline Modules
+│   ├── config.py               # Central hyperparameters and paths
+│   ├── download_data.py        # Fetches MIT-BIH from PhysioNet
+│   ├── extract_beats.py        # Slices 1D signals into individual beats
+│   ├── build_scalograms.py     # CWT mathematical conversion to 2D images
+│   ├── dataset.py              # PyTorch Dataloaders with Augmentation
+│   ├── model.py                # SmallNet & GoogLeNet architectures
+│   ├── train.py                # Main training loop
+│   └── evaluate.py             # Inference testing script
+├── generate_results.py         # Complete evaluation & dashboard generation tool
+└── requirements.txt            # Python dependencies
 ```
 
-## Models
+---
 
-| Model     | Parameters | Architecture                          |
-|-----------|-----------|---------------------------------------|
-| SmallNet  | ~5K       | 4× (Conv→BN→ReLU→MaxPool) + FC head  |
-| GoogLeNet | ~6.8M     | Pre-trained ImageNet, fine-tuned FC   |
+## 💻 Installation & Setup (Local)
 
-## Dataset
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Revant-S/BMI_Project.git
+   cd BMI_Project
+   ```
 
-**MIT-BIH Arrhythmia Database** — 48 half-hour dual-channel ECG recordings at 360 Hz from PhysioNet.  
-Records with paced beats (102, 104, 107, 217) are excluded per AAMI standard.
+2. **Install requirements:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-## Metrics
+3. **Run the Data Pipeline:**
+   ```bash
+   python -m src.download_data
+   python -m src.extract_beats
+   python -m src.build_scalograms --workers 4
+   ```
 
-- Accuracy, Sensitivity, Specificity, Precision, F1-Score
-- ROC Curve + AUC
-- Confusion Matrix
+4. **Train Models:**
+   ```bash
+   python -m src.train --model smallnet --epochs 25
+   python -m src.train --model googlenet --epochs 25
+   ```
+
+5. **Evaluate & Generate Visual Dashboards:**
+   ```bash
+   python generate_results.py --model all
+   ```
+
+---
+
+## ⚡ Google Colab (1-Click GPU Training)
+
+Don't have a local GPU? We have built a fully automated Jupyter Notebook designed specifically to run this entire pipeline on Google Colab's Free T4 GPU.
+
+**[Open the Automated GPU Training Notebook directly in Google Colab](https://colab.research.google.com/github/Revant-S/BMI_Project/blob/feature/2d-cnn-pipeline/notebooks/colab_training.ipynb)**
+
+1. Click **Runtime -> Change runtime type** and select **T4 GPU**.
+2. Click **Run All**.
+3. The notebook will automatically download the data, generate the scalograms, train both models in minutes, and download the final `.pth` weights and `.png` dashboards directly to your computer!
+
+---
+
+## 👥 Contributors (National Institute of Technology, Tiruchirappalli)
+
+* **Shagnik Sarkar** (110123102)
+* **Revant Sinha** (110123088)
+* **Satrajeet Paul** (110123100)
+* **Mayank Das** (110123064)
+
+*Project completed as part of the Biomedical Instrumentation curriculum.*
