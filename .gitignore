@@ -1,30 +1,56 @@
-# Dataset & large binary files (too large for GitHub)
-mitbih_data/
-processed/
-checkpoints/
+# ==========================================
+# Data & large files (too big for git)
+# ==========================================
+data/
 
-# Results (optional — comment out if you want to include plots)
-results/
+# ==========================================
+# Model checkpoints & results artifacts
+# (Commented out so they upload to GitHub!)
+# ==========================================
+# results/*.pth
+# results/*.png
+# results/*.json
+# results/*.txt
 
+# ==========================================
 # Python
+# ==========================================
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 *.egg-info/
+*.egg
 dist/
 build/
 .eggs/
+
+# ==========================================
+# Virtual environments
+# ==========================================
 venv/
 env/
+.env
 .venv/
 
-# macOS
-.DS_Store
-
-# Jupyter
+# ==========================================
+# Jupyter Notebook
+# ==========================================
 .ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
 
-# IDE
+# ==========================================
+# IDE / Editor
+# ==========================================
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+
+# ==========================================
+# OS generated
+# ==========================================
+.DS_Store
+Thumbs.db
+desktop.ini
